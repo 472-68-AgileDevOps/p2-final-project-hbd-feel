@@ -25,6 +25,8 @@ Route::post('/login', [AuthenticateController::class, 'login'])->name('user.logi
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/applications', [ApplicationController::class, 'store']);
+    Route::put('/application/{id}', [ApplicationController::class, 'update']);
+    Route::delete('/application/{id}', [ApplicationController::class, 'destroy']);
     Route::get('/applications', [ApplicationController::class, 'getAllApplications']);
     Route::get('/applications/count', [ApplicationController::class, 'getApplicationCountByStatus']);
     Route::get('/applications/count/inprogress', [ApplicationController::class, 'getApplicationCountInprogress']);
