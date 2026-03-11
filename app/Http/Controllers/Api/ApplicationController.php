@@ -250,20 +250,12 @@ class ApplicationController extends Controller
 
             $application = Application::with('event')->findOrFail($id);
 
-            // Check if user is authorized (owns the application or is admin)
             $isOwner = $application->student_id === $user->student_id;
-            $isAdmin = $user->role === UserRole::ADMIN;
 
-            if (!$isOwner && !$isAdmin) {
+            if (!$isOwner) {
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
 
-            // Check if application can be edited (not fully approved)
-            if ($application->status === ApplicationStatus::APPROVED && $application->level >= 6) {
-                return response()->json(['message' => 'Cannot edit approved application'], 400);
-            }
-
-            // Check if current date is within event date range
             $now = now();
             if (!$application->event
                 || !$application->event->start_date
@@ -278,29 +270,25 @@ class ApplicationController extends Controller
             $requirements = $award->requirements ?? [];
 
             $rules = [
-                'year'     => ['required', 'integer'],
-                'grade'    => ['required', 'numeric'],
-                'path'     => ['nullable', 'file', 'mimes:pdf,jpg,png', 'max:10240'],
+                'year'     => ['required', 'integer','min:1', 'max:4'],
+                'grade'    => ['required', 'numeric', 'min:0', 'max:4'],
+                'path'     => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
                 'documents' => ['nullable', 'array'],
             ];
 
             foreach ($requirements as $req) {
                 $key = $req['id'];
-                $rules["documents.$key"] = ['nullable', 'file', 'mimes:pdf,jpg,png', 'max:5120'];
+                $rules["documents.$key"] = ['nullable', 'file', 'mimes:pdf', 'max:5120'];
             }
 
             $validated = $request->validate($rules);
-
-            // Update year and grade
             $application->year = $validated['year'];
             $application->grade = $validated['grade'];
 
-            // Handle main file upload
             if ($request->hasFile('path')) {
                 $applicationFile = $request->file('path');
                 $appFileName = Str::uuid() . '.' . $applicationFile->getClientOriginalExtension();
 
-                // Delete old file if exists
                 if ($application->path) {
                     Storage::disk('s3')->delete($application->path);
                 }
@@ -308,13 +296,12 @@ class ApplicationController extends Controller
                 $mainPath = Storage::disk('s3')->putFileAs('applications', $applicationFile, $appFileName);
 
                 if (!$mainPath) {
-                    return response()->json(['error' => 'Could not upload main file.'], 500);
+                    return response()->json(['error' => 'Could not upload file.'], 500);
                 }
 
                 $application->path = $mainPath;
             }
 
-            // Handle requirement documents
             $storedDocuments = $application->documents ?? [];
 
             foreach ($requirements as $req) {
@@ -324,7 +311,6 @@ class ApplicationController extends Controller
                     $file = $request->file("documents.$key");
                     $fileName = Str::uuid() . '.' . $file->getClientOriginalExtension();
 
-                    // Delete old file if exists
                     if (isset($storedDocuments[$key]['file_path'])) {
                         Storage::disk('s3')->delete($storedDocuments[$key]['file_path']);
                     }
@@ -361,17 +347,15 @@ class ApplicationController extends Controller
                 return response()->json(['message' => 'Unauthenticated'], 401);
             }
 
-            // ใช้ find ธรรมดาแทน findOrFail เพื่อคุม Error เองได้ง่ายขึ้น
             $application = Application::find($id);
             if (!$application) {
                 return response()->json(['message' => 'Application not found'], 404);
             }
 
-            // ตรวจสอบสิทธิ์
+            
             $isOwner = $application->student_id === $user->student_id;
-            $isAdmin = $user->role === UserRole::ADMIN; // ระวัง: ถ้าไม่มี UserRole Class จะพังตรงนี้
 
-            if (!$isOwner && !$isAdmin) {
+            if (!$isOwner) {
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
 

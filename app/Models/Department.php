@@ -11,7 +11,8 @@ class Department extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name'
+        'name',
+        'faculty_id'
     ];
 
     public function user()
